@@ -4,7 +4,7 @@ import groovy.sql.Sql
 
 int partitions = 10   //fixed number
 int oneK = 1000
-int factor = 10000     // or 10000
+int factor = 10000     // or 1000
 int partitionSize = factor * oneK / partitions
 int batchSize = 1000  //fixed
 

@@ -2,7 +2,7 @@ package bulkOperations
 
 import groovy.sql.Sql
 
-int factor = 10000
+int factor = 1000
 String url = "jdbc:sqlite:C:\\sqlite\\bulkTests\\bulkData${factor}k.db"
 Sql sql = Sql.newInstance(url)
 String dataFile = "C:\\sqlite\\bulkTests\\bulkData${factor}k.txt"
@@ -29,7 +29,7 @@ String temp = "PRAGMA temp_store = MEMORY"
 int oneK = 1000
 int maxRows = factor*oneK
 int batchSize = maxRows/10
-int count
+
 
 long startTime = System.currentTimeSeconds()
 

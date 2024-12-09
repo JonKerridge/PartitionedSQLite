@@ -32,6 +32,8 @@ create temp table t as
  select id, col4 from p10.bulkData
 """
 
+String index = """create index tIndex on t(id)"""
+
 String select = """Select col4, count(*) from t group by col4"""
 
 long startTime = System.currentTimeSeconds()
@@ -43,6 +45,7 @@ for ( i in 2 .. 10){
 }
 
 sql.execute(createTable)
+sql.execute(index)
 
 List rows = sql.rows(select)
 rows.each{r ->
