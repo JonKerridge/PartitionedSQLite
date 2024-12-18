@@ -2,7 +2,7 @@ package bulkOperations
 
 Random random = new Random()
 
-def randStr(random, length) {
+def randStr(Random random, int length) {
   return random.with { (1..length)
       .collect { (('A'..'Z')+('0'..'9')+('a'..'z'))
           .join()[ nextInt( (('A'..'Z')+('0'..'9')+('a'..'z'))
@@ -10,24 +10,19 @@ def randStr(random, length) {
       .join() }
 }
 
-def randInt(random, maxSize) {
+def randInt(Random random, int maxSize) {
   return Math.abs(random.nextInt() % maxSize) + 1
 }
 
-def randReal(random, maxValue){
+def randReal(Random random, float maxValue){
   return (random.nextFloat() * maxValue).round(2)
 }
-
-println "test string = ${randStr(random, 20)}"
-println "test integer = ${randInt(random, 20)}"
-println "test real = ${randReal(random, 20)}"
-
 
 String bulkDataFolder = "C:\\sqlite\\bulkTests\\"
 String bulkFilePrefix = "bulkTest"
 
-int m =1000000
-for (int factor in [2,4,8]) {
+int m = 1024 * 1024
+for (int factor in [1,2,4,8]) {
   int nRows = m * factor
   String fileName = bulkDataFolder + bulkFilePrefix + "${factor}m.txt"
   println "Creating file $fileName"
@@ -35,7 +30,7 @@ for (int factor in [2,4,8]) {
   FileWriter writer = new FileWriter(new File(fileName))
   for (i in 1..nRows) {
     String rowValues
-    rowValues = """${i},${randStr(16)},${randNum(20)},${randNum(5)}"""
+    rowValues = """${i},${randStr(random, 16)},${randInt(random, 20)},${randReal(random, 5.0)}"""
     writer.println(rowValues)
   }
   writer.flush()

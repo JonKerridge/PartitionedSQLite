@@ -1,85 +1,98 @@
 package bulkOperations
 
-import groovy.sql.Sql
+import groovy_jcsp.PAR
+import jcsp.lang.CSProcess
 
-int partitions = 10   //fixed number
-int oneK = 1000
-int factor = 10000     // or 1000
-int partitionSize = factor * oneK / partitions
-int batchSize = 1000  //fixed
+int oneM = 1024 * 1024
 
 String directory = "C:\\sqlite\\bulkTests\\"
-String dataFile = directory + "bulkData${factor}k.txt"
-
-String dropTable = """drop table if exists bulkData"""
-
-String createTable = """
-CREATE TABLE bulkData (
-id INTEGER PRIMARY KEY, 
-col2 TEXT, 
-col3 INTEGER,
-col4 INTEGER)
-"""
-
-String insertRow = """
-insert into bulkData values (?,?,?,?)
-"""
-
-String jmOff = "PRAGMA journal_mode = OFF"
-String synch = "PRAGMA synchronous = 0"
-String cache = "PRAGMA cache_size = 1000000"
-String lock = "PRAGMA locking_mode = EXCLUSIVE"
-String temp = "PRAGMA temp_store = MEMORY"
-
-// read in all the data to be imported
-long startTime = System.currentTimeSeconds()
-
+String dataFile
+List <CSProcess> writers
 List <List> rowData
-rowData = []
-
-FileReader reader = new FileReader(new File(dataFile))
-reader.eachLine { line ->
-  List tokens
-  tokens = line.tokenize(',')
-  List lineData
-  lineData = [
-      Integer.parseInt(tokens[0]),
-      tokens[1],
-      Integer.parseInt(tokens[2]),
-      Integer.parseInt(tokens[3])
-  ]
-  rowData << lineData
+List<String> results
+results = []
+for ( f in [1,2,4,8])   results << "Read,${f},,"
+for (f in [1,2,4,8]){
+  for (p in [1,2,4,8,16])
+    results << "Write,${f},${p},"
 }
-long readTime = System.currentTimeSeconds()
-println "$factor k data copied to internal memory in ${readTime- startTime} seconds"
 
-for ( pn in 1 .. partitions) {
-  long startLoad = System.currentTimeSeconds()
-  String url = "jdbc:sqlite:C:\\sqlite\\bulkTests\\bulkDataBase${factor}k${pn}p.db"
-  println "Creating $url"
-  Sql sql = Sql.newInstance(url)
-  // create table within the partition
-  sql.execute(dropTable)
-  sql.execute(createTable)
-  // now do some optimisations
-  sql.execute(jmOff)
-  sql.execute(synch)
-  sql.execute(cache)
-  sql.execute(lock)
-  sql.execute(temp)
-  // now insert data in batches
-  int offset
-  offset = (pn - 1) * partitionSize
-  sql.withBatch(batchSize, insertRow) {ps ->
-    for (i in 0 ..< partitionSize) {
-      ps.addBatch(rowData[offset])
-      offset++
+for ( r in 1 .. 5) { // 5 runs
+  println "Run $r"
+  for (f in [1, 2, 4, 8]) {
+    // read in all the data to be imported
+    long startTime = System.currentTimeMillis()
+    dataFile = directory + "bulkTest${f}m.txt"
+    rowData = []
+    FileReader reader = new FileReader(new File(dataFile))
+    reader.eachLine { line ->
+      List tokens
+      tokens = line.tokenize(',')
+      List lineData
+      lineData = [Integer.parseInt(tokens[0]),
+                  tokens[1],
+                  Integer.parseInt(tokens[2]),
+                  Float.parseFloat(tokens[3])]
+      rowData << lineData
     }
-  } // with batch
-  long endLoad = System.currentTimeSeconds()
-  println "Partition $pn written to its database in ${endLoad-startLoad} seconds"
-  sql.close()
-} // end for
+    long readTime = System.currentTimeMillis()
+    println "Read size ${f}"
+    int readRow, writeOffset, writeRow
+    switch (f) {
+      case 1:
+        readRow = 0
+        writeOffset = 4
+        break
+      case 2:
+        readRow = 1
+        writeOffset = 9
+        break
+      case 4:
+        readRow = 2
+        writeOffset = 14
+        break
+      case 8:
+        readRow = 3
+        writeOffset = 19
+        break
+    }
+    results[readRow] = results[readRow] + "${readTime - startTime},"
+    for (p in [1, 2, 4, 8, 16]) {  // number of partitions
+      long startLoad = System.currentTimeMillis()
+      writers = []
+      int partitionSize = (int) (f * oneM / p)
+      for (pn in 1..p) {
+        String url = "jdbc:sqlite:C:\\sqlite\\bulkTests\\bulkDB_${f}M_${p}PS_${pn}p.db"
+        WritePartition wp = new WritePartition(partitionSize: partitionSize,
+            partitionNumber: pn,
+            databaseURL: url,
+            rowData: rowData)
+        writers << wp
+      } // end for partitions
+      new PAR(writers).run()
+      long endLoad = System.currentTimeMillis()
+//    println "bulkDB_${f}M_${p}PS partition(s) written to databases in ${endLoad - startLoad} seconds"
+//    println "Write, $f, $p, ${endLoad - startLoad}"
+      switch (p) {
+        case 1:
+          writeRow = writeOffset
+          break
+        case 2:
+          writeRow = writeOffset + 1
+          break
+        case 4:
+          writeRow = writeOffset + 2
+          break
+        case 8:
+          writeRow = writeOffset + 3
+          break
+        case 16:
+          writeRow = writeOffset + 4
+          break
+      }
+      results[writeRow] = results[writeRow] + "${endLoad - startLoad},"
+    }
+  } // end for f
+} // end r
+results.each{println "${it}"}
 
-long endTime = System.currentTimeSeconds()
-println "\nElapsed time = ${endTime - startTime} seconds"
